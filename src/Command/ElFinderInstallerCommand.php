@@ -18,13 +18,13 @@ use Symfony\Component\Filesystem\Filesystem;
 )]
 final class ElFinderInstallerCommand extends Command
 {
-    private const ELFINDER_CSS_DIR = 'vendor/studio-42/elfinder/css';
+    private const ELFINDER_CSS_DIR = 'css';
 
-    private const ELFINDER_JS_DIR = 'vendor/studio-42/elfinder/js';
+    private const ELFINDER_JS_DIR = 'js';
 
-    private const ELFINDER_SOUNDS_DIR = 'vendor/studio-42/elfinder/sounds';
+    private const ELFINDER_SOUNDS_DIR = 'sounds';
 
-    private const ELFINDER_IMG_DIR = 'vendor/studio-42/elfinder/img';
+    private const ELFINDER_IMG_DIR = 'img';
 
     public function __construct(
         protected Filesystem $fileSystem,
@@ -37,6 +37,7 @@ final class ElFinderInstallerCommand extends Command
     {
         $this
             ->addOption('docroot', null, InputOption::VALUE_OPTIONAL, 'Website document root.', 'public')
+            ->addOption('elfinder-vendor-dir', null, InputOption::VALUE_REQUIRED, 'Vendor containing elfinder assets', 'studio-42/elfinder')
             ->setHelp(<<<'EOF'
                 Default docroot:
                   <info>public</info>
@@ -52,6 +53,7 @@ final class ElFinderInstallerCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
         $dr = $input->getOption('docroot');
+        $vendorDir = $input->getOption('elfinder-vendor-dir');
         $io->title('elFinder Installer');
         $io->comment(sprintf('Trying to install elfinder to %s directory', $dr));
 
@@ -59,18 +61,25 @@ final class ElFinderInstallerCommand extends Command
 
         $publicDir = sprintf('%s/%s/bundles/fmelfinder', $rootDir, $dr);
 
-        $reflection    = new ReflectionClass(\Composer\Autoload\ClassLoader::class);
-        $vendorRootDir = dirname($reflection->getFileName(), 3);
+        $reflection = new ReflectionClass(\Composer\Autoload\ClassLoader::class);
+        $vendorRootDir = dirname($reflection->getFileName(), 3) . '/vendor';
 
         $io->note(sprintf('Starting to install elfinder to %s folder', $publicDir));
 
-        $this->fileSystem->mirror($vendorRootDir . '/' . self::ELFINDER_CSS_DIR, $publicDir . '/css');
-        $this->fileSystem->mirror($vendorRootDir . '/' . self::ELFINDER_IMG_DIR, $publicDir . '/img');
-        $this->fileSystem->mirror($vendorRootDir . '/' . self::ELFINDER_JS_DIR, $publicDir . '/js');
-        $this->fileSystem->mirror($vendorRootDir . '/' . self::ELFINDER_SOUNDS_DIR, $publicDir . '/sounds');
+        // validate $vendorDir to match namespace/vendor name
+        if (!preg_match('/^([a-z0-9-]+)\/([a-z0-9-]+)$/i', $vendorDir)) {
+            $io->error(sprintf('Invalid vendor directory name %s', $vendorDir));
+
+            return Command::FAILURE;
+        }
+
+        $this->fileSystem->mirror($vendorRootDir . '/' . $vendorDir . '/' . self::ELFINDER_CSS_DIR, $publicDir . '/css');
+        $this->fileSystem->mirror($vendorRootDir . '/' . $vendorDir . '/' . self::ELFINDER_IMG_DIR, $publicDir . '/img');
+        $this->fileSystem->mirror($vendorRootDir . '/' . $vendorDir . '/' . self::ELFINDER_JS_DIR, $publicDir . '/js');
+        $this->fileSystem->mirror($vendorRootDir . '/' . $vendorDir . '/' . self::ELFINDER_SOUNDS_DIR, $publicDir . '/sounds');
 
         $io->success('elFinder assets successfully installed');
 
-        return 0;
+        return Command::SUCCESS;
     }
 }
